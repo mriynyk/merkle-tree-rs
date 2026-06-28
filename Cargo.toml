@@ -1,0 +1,18 @@
+[workspace]
+resolver = "3"
+members = ["crates/core", "crates/cli"]
+
+[workspace.package]
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/mriynyk/merkle-tree-rs"
+version = "0.1.0"
+
+[workspace.dependencies]
+mriynyk-merkle = { path = "crates/core", version = "0.1.0" }
+
+[profile.release]
+lto = true
+codegen-units = 1
+strip = true
