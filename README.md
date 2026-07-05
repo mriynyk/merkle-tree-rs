@@ -1,20 +1,24 @@
-# merkle-tree-rs
+# mriynyk-merkle
 
-> ⚠️ **Early placeholder release.** The public API is not available yet — these
-> first versions reserve the crate names and validate the release pipeline.
+[![crates.io](https://img.shields.io/crates/v/mriynyk-merkle.svg)](https://crates.io/crates/mriynyk-merkle)
+[![docs.rs](https://docs.rs/mriynyk-merkle/badge.svg)](https://docs.rs/mriynyk-merkle)
 
-Merkle tree utilities for the EVM, written in Rust.
+Zero-dependency, `#![no_std]` Merkle tree utilities written in Rust. The default
+API needs no allocator; `alloc` and `std` are opt-in.
 
-This repository is a Cargo workspace with two crates:
+> ⚠️ **Early placeholder release.** The public API is not available yet and will
+> land in a future version.
 
-| Crate | Description | crates.io |
-|-------|-------------|-----------|
-| [`mriynyk-merkle`](crates/core) | Core library for building and verifying Merkle trees | [![crates.io](https://img.shields.io/crates/v/mriynyk-merkle.svg)](https://crates.io/crates/mriynyk-merkle) |
-| [`mriynyk-merkle-cli`](crates/cli) | Command-line interface (the `merkle` binary) | [![crates.io](https://img.shields.io/crates/v/mriynyk-merkle-cli.svg)](https://crates.io/crates/mriynyk-merkle-cli) |
+## Installation
+
+```toml
+[dependencies]
+mriynyk-merkle = "0.1"
+```
 
 ## Status
 
-Work in progress. Solana VM support is planned for a later release.
+Work in progress.
 
 ## License
 

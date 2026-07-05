@@ -1,16 +1,35 @@
-[workspace]
-resolver = "3"
-members = ["crates/core", "crates/cli"]
-
-[workspace.package]
+[package]
+name = "mriynyk-merkle"
+description = "Merkle tree utilities."
+version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mriynyk/merkle-tree-rs"
-version = "0.1.0"
+homepage = "https://github.com/mriynyk/merkle-tree-rs"
+readme = "README.md"
+keywords = ["merkle-tree", "merkle-proof", "no-std", "blockchain", "zk"]
+categories = [
+    "cryptography",
+    "cryptography::cryptocurrencies",
+    "data-structures",
+    "no-std",
+    "no-std::no-alloc",
+]
 
-[workspace.dependencies]
-mriynyk-merkle = { path = "crates/core", version = "0.1.0" }
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
+
+[dependencies]
+
+[dev-dependencies]
+sha3 = "0.10"
+
+[features]
+default = []
+alloc = []
+std = ["alloc"]
 
 [profile.release]
 lto = true
