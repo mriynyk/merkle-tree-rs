@@ -1,23 +1,5 @@
 use crate::Hasher;
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum RootError {
-    EmptyInput,
-}
-
-impl core::fmt::Display for RootError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(match self {
-            RootError::EmptyInput => "input is empty",
-        })
-    }
-}
-
-impl core::error::Error for RootError {}
-
 pub fn root_in_place<H: Hasher>(
     hasher: &H,
     buffer: &mut [H::Hash],
@@ -55,10 +37,24 @@ pub fn root_in_place<H: Hasher>(
 }
 
 #[cfg(feature = "alloc")]
-pub fn root<H: Hasher>(
-    hasher: &H,
-    mut leaves: Vec<H::Hash>,
-    padding: H::Hash,
-) -> Result<H::Hash, RootError> {
+use alloc::vec::Vec;
+
+#[cfg(feature = "alloc")]
+pub fn root<H: Hasher>(hasher: &H, mut leaves: Vec<H::Hash>, padding: H::Hash) -> Result<H::Hash, RootError> {
     root_in_place(hasher, &mut leaves, padding)
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RootError {
+    EmptyInput,
+}
+
+impl core::fmt::Display for RootError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            RootError::EmptyInput => "input is empty",
+        })
+    }
+}
+
+impl core::error::Error for RootError {}

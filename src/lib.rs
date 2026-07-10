@@ -19,19 +19,17 @@
 extern crate alloc;
 
 mod hasher;
-mod root;
-mod proof;
 mod process_proof;
+mod proof;
+mod root;
 mod verify;
 
 pub use hasher::Hasher;
-pub use root::{root_in_place, RootError};
-pub use proof::{proof_in_place, ProofError};
 pub use process_proof::process_proof;
-pub use verify::{verify, VerifyError};
-
-#[cfg(feature = "alloc")]
-pub use root::root;
-
 #[cfg(feature = "alloc")]
 pub use proof::proof;
+pub use proof::{ProofError, proof_in_place};
+#[cfg(feature = "alloc")]
+pub use root::root;
+pub use root::{RootError, root_in_place};
+pub use verify::{VerifyError, verify};

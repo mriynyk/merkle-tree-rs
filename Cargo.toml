@@ -24,14 +24,33 @@ rustdoc-args = ["--cfg", "docsrs"]
 [dependencies]
 
 [dev-dependencies]
-sha3 = "0.10"
+sha3 = "0.12.0"
+sha2 = "0.11.0"
+light-poseidon = "0.4.0"
+ark-ff = "0.5.0"
+ark-bn254 = "0.5.0"
 
 [features]
 default = []
 alloc = []
 std = ["alloc"]
 
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
+[[example]]
+name = "keccak256_positional"
+required-features = ["alloc"]
+
+[[example]]
+name = "keccak256_commutative"
+required-features = ["alloc"]
+
+[[example]]
+name = "sha256"
+required-features = ["alloc"]
+
+[[example]]
+name = "poseidon"
+required-features = ["alloc"]
+
+[[example]]
+name = "domain_separated"
+required-features = ["alloc"]

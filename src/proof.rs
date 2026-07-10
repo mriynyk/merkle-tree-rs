@@ -1,25 +1,5 @@
 use crate::Hasher;
 
-#[cfg(feature = "alloc")]
-use alloc::vec::Vec;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ProofError {
-    EmptyInput,
-    IndexOutOfRange,
-}
-
-impl core::fmt::Display for ProofError {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        f.write_str(match self {
-            ProofError::EmptyInput => "input is empty",
-            ProofError::IndexOutOfRange => "leaf index out of range",
-        })
-    }
-}
-
-impl core::error::Error for ProofError {}
-
 pub fn proof_in_place<'b, H: Hasher>(
     hasher: &H,
     buffer: &'b mut [H::Hash],
@@ -85,6 +65,9 @@ pub fn proof_in_place<'b, H: Hasher>(
 }
 
 #[cfg(feature = "alloc")]
+use alloc::vec::Vec;
+
+#[cfg(feature = "alloc")]
 pub fn proof<H: Hasher>(
     hasher: &H,
     mut leaves: Vec<H::Hash>,
@@ -97,3 +80,20 @@ pub fn proof<H: Hasher>(
 
     Ok(leaves)
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProofError {
+    EmptyInput,
+    IndexOutOfRange,
+}
+
+impl core::fmt::Display for ProofError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(match self {
+            ProofError::EmptyInput => "input is empty",
+            ProofError::IndexOutOfRange => "leaf index out of range",
+        })
+    }
+}
+
+impl core::error::Error for ProofError {}
