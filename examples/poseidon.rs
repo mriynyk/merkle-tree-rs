@@ -1,15 +1,12 @@
 //! # Poseidon (BN254) hasher
 //!
 //! This example implements the `Hasher` trait with **Poseidon over the BN254 scalar
-//! field** and uses it to build a Merkle root, produce an inclusion proof, and verify
-//! that proof. Poseidon is commonly used in zero-knowledge systems, where it is far more
-//! efficient than hashes like Keccak or SHA-256.
+//! field** and uses it to compute a root, build a proof, and verify that proof against
+//! the root. Poseidon is commonly used in zero-knowledge systems.
 //!
-//! Poseidon has to be configured up front, so the hasher holds that config. That is why
-//! `Hasher::hash` takes `&self`, an instance, rather than being a free function: a
-//! stateless trait couldn't carry it. The `light_poseidon` sponge hashes through
-//! `&mut self`, so we bridge it to our `&self` method with a `RefCell` — interior
-//! mutability.
+//! Poseidon has to be configured up front, so the hasher holds that configuration as a
+//! `light_poseidon` sponge. The sponge mutates as it hashes, so it sits behind a
+//! `RefCell` — the interior mutability the `Hasher` trait calls for.
 //!
 //! Run with:
 //!
@@ -23,23 +20,22 @@
 use core::cell::RefCell;
 
 use ark_bn254::Fr;
-use ark_ff::{BigInteger, PrimeField, Zero};
+use ark_ff::{BigInteger, PrimeField};
 use light_poseidon::{Poseidon, PoseidonHasher};
 use mriynyk_merkle::{self as merkle, Hasher};
 
-/// Stateful Poseidon (BN254) pair hasher.
+/// Stateful Poseidon (BN254) node hasher.
 ///
-/// Holds a `light_poseidon` sponge configured for two inputs. The sponge hashes through
-/// `&mut self`, so it lives behind a `RefCell` to fit our `&self` API.
+/// Holds a `light_poseidon` sponge configured for two inputs, behind a `RefCell` so that
+/// hashing can mutate it.
 struct PoseidonBn254 {
     sponge: RefCell<Poseidon<Fr>>,
 }
 
 impl PoseidonBn254 {
     fn new() -> Self {
-        // `new_circom(2)` configures the sponge for exactly two field inputs — one binary
-        // node (left, right).
         let sponge = Poseidon::<Fr>::new_circom(2).expect("valid Poseidon width");
+
         Self {
             sponge: RefCell::new(sponge),
         }
@@ -50,9 +46,6 @@ impl Hasher for PoseidonBn254 {
     type Hash = Fr;
 
     fn hash(&self, left: &Fr, right: &Fr) -> Fr {
-        // `borrow_mut` exposes the `&mut self` sponge under our `&self` method. The
-        // sponge resets its state on each call, so reusing one instance across every pair
-        // is correct; two inputs always match the configured width, so this never errors.
         self.sponge
             .borrow_mut()
             .hash(&[*left, *right])
@@ -63,32 +56,28 @@ impl Hasher for PoseidonBn254 {
 fn main() {
     let hasher = PoseidonBn254::new();
 
-    // `padding` is the empty-leaf value used to pad the leaf count up to a power of two.
-    // It must not be a valid leaf value.
-    let padding = Fr::zero();
+    // The padding must not be a valid leaf value. Leaves here are `u64` values, so any
+    // field element beyond that range cannot be one.
+    let padding = Fr::from(u128::MAX);
 
-    // Build the leaves. Five values -> odd count -> the tree is lazily padded up to a
-    // perfect 8-leaf tree.
+    // Build the leaves.
     let values: [u64; 5] = [100, 50, 75, 25, 200];
     let leaves: Vec<Fr> = values.iter().map(|&v| Fr::from(v)).collect();
 
     println!("leaves ({}):", leaves.len());
     leaves.iter().enumerate().for_each(|(i, leaf)| {
-        println!("  [{i}] value 0x{}", fr_hex(*leaf));
+        println!("  [{i}]: 0x{}", fr_hex(*leaf));
     });
     println!();
 
-    // Build the root. `root` and `proof` each *consume* the vector they are given,
-    // reusing it as in-place scratch buffer — that is how the library stays
-    // allocation-free internally.
+    // Compute the root.
     let root = merkle::root(&hasher, leaves.clone(), padding).expect("leaves are non-empty");
 
     println!("root:");
     println!("  0x{}", fr_hex(root));
     println!();
 
-    // Prove that leaf #2 (value 75) is in the tree at index 2. The proof is the list of
-    // sibling hashes on the path from the leaf up to the root, ordered leaf -> root.
+    // Build the proof.
     let leaf_idx = 2;
     let proof = merkle::proof(&hasher, leaves.clone(), leaf_idx, padding).expect("index is in range");
 

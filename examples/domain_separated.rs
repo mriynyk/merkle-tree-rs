@@ -1,22 +1,24 @@
 //! # Domain-separated SHA-256 hasher
 //!
-//! A Merkle tree hashes three kinds of value: **leaves** (application data), **internal
-//! nodes** (a pair of child hashes), and **padding** (the empty-leaf filler). If any two
-//! share a hashing domain, one can be replayed as another — a second-preimage attack.
+//! This example implements the `Hasher` trait with **domain-separated SHA-256** and uses
+//! it to compute a root, build a proof, and verify that proof against the root.
 //!
-//! The sharpest case is a node passed off as a leaf. An internal node is
-//! `hash(left ‖ right)`, the hash of 64 bytes; if a leaf is also just `hash(data)`, a
-//! 64-byte leaf whose bytes equal some `left ‖ right` produces the *same* digest as that
-//! node, letting an attacker prove membership of something that was never a leaf. Padding
-//! raises the same risk: it fills empty slots, so if its digest could equal a real
-//! leaf's, an empty slot could be proven as a committed member.
+//! ## Why domain separation
 //!
-//! The fix is **domain separation**: hash each kind of value in its own domain so their
-//! digests can never coincide. This example prepends a one-byte tag before hashing —
-//! `0x00` for a leaf, `0x01` for a node, `0x02` for padding — keeping all three preimage
-//! spaces disjoint by their first byte, even when the underlying bytes match.
+//! A Merkle tree hashes two different kinds of value: **leaves** (application data) and
+//! **internal nodes** (two child hashes). If both are hashed the same way, an internal
+//! node can be replayed as if it were a leaf — a second-preimage attack. Concretely: an
+//! internal node is `hash(left ‖ right)`, the hash of 64 bytes. If a leaf is also just
+//! `hash(data)`, then a 64-byte leaf whose bytes happen to equal some `left ‖ right`
+//! produces the *same* digest as that node. An attacker can then present an internal node
+//! as a "leaf" and prove membership of something that was never a real leaf.
 //!
-//! (OpenZeppelin's `StandardMerkleTree` reaches the same goal differently: it
+//! The fix is **domain separation**: hash leaves and nodes over disjoint inputs, so no
+//! choice of leaf data can reproduce a node's digest. This example prepends a one-byte
+//! domain tag before hashing — `0x00` for a leaf, `0x01` for a node — so a node preimage
+//! (`0x01 ‖ left ‖ right`) can never equal a leaf preimage (`0x00 ‖ data`).
+//!
+//! (OpenZeppelin's `StandardMerkleTree.js` reaches the same goal differently: it
 //! **double-hashes** leaves — `keccak256(keccak256(data))` — so a leaf can never match a
 //! single-hashed internal node. A domain tag is just a more explicit way to draw the same
 //! boundary.)
@@ -39,12 +41,10 @@ const LEAF_DOMAIN: u8 = 0x00;
 /// Domain tag prepended before hashing an internal node.
 const NODE_DOMAIN: u8 = 0x01;
 
-/// Domain tag prepended before hashing padding.
-const PADDING_DOMAIN: u8 = 0x02;
-
-/// SHA-256 pair hasher with a domain tag for internal nodes.
+/// Domain-separated SHA-256 node hasher.
 ///
-/// Hashes `NODE_DOMAIN ‖ left ‖ right`.
+/// Combines the two child hashes in the internal-node domain —
+/// `NODE_DOMAIN ‖ left ‖ right`.
 struct DomainSeparatedSha256;
 
 impl Hasher for DomainSeparatedSha256 {
@@ -60,11 +60,9 @@ impl Hasher for DomainSeparatedSha256 {
     }
 }
 
-/// Hash raw application bytes into a leaf digest, in the leaf domain.
+/// Leaf hasher.
 ///
-/// Hashes `LEAF_DOMAIN ‖ data`. The leading tag keeps every leaf digest in a domain
-/// disjoint from nodes and padding, so a 64-byte leaf can never hash to the same digest
-/// as an internal node.
+/// Hashes application data in the leaf domain — `LEAF_DOMAIN ‖ data`.
 fn leaf_hash(data: &[u8]) -> [u8; 32] {
     let mut h = Sha256::new();
 
@@ -73,23 +71,11 @@ fn leaf_hash(data: &[u8]) -> [u8; 32] {
     h.finalize().into()
 }
 
-/// Hash the empty-leaf into a digest, in the padding domain.
-///
-/// Hashes `PADDING_DOMAIN ‖ data`. The leading tag keeps padding in a domain disjoint
-/// from leaves, so an empty slot can never match a committed leaf.
-fn padding_hash(data: &[u8]) -> [u8; 32] {
-    let mut h = Sha256::new();
-
-    h.update([PADDING_DOMAIN]);
-    h.update(data);
-    h.finalize().into()
-}
-
 fn main() {
     let hasher = DomainSeparatedSha256;
 
-    // `padding` is used to pad the leaf count up to a power of two.
-    let padding = padding_hash(b"");
+    // The padding must not be a valid leaf value.
+    let padding = [0u8; 32];
 
     // Build the leaves.
     let records: [&str; 5] = ["alice:100", "bob:50", "carol:75", "dave:25", "erin:200"];
@@ -101,14 +87,14 @@ fn main() {
     });
     println!();
 
-    // Build the root.
+    // Compute the root.
     let root = merkle::root(&hasher, leaves.clone(), padding).expect("leaves are non-empty");
 
     println!("root:");
     println!("  0x{}", hex(&root));
     println!();
 
-    // Build the proof for leaf #2 ("carol:75").
+    // Build the proof.
     let leaf_idx = 2;
     let proof = merkle::proof(&hasher, leaves.clone(), leaf_idx, padding).expect("index is in range");
 

@@ -1,10 +1,10 @@
 //! # SHA-256 hasher
 //!
-//! This example implements the `Hasher` trait with **SHA-256** and uses it to build a
-//! Merkle root, produce an inclusion proof, and verify that proof.
+//! This example implements the `Hasher` trait with **SHA-256** and uses it to compute a
+//! root, build a proof, and verify that proof against the root.
 //!
-//! The tree is positional — pairs are hashed in order, without sorting, so a leaf's
-//! position is committed by its proof.
+//! The hasher is positional: it combines the two child hashes in the given order, so a
+//! leaf's position is committed.
 //!
 //! Run with:
 //!
@@ -18,9 +18,9 @@
 use mriynyk_merkle::{self as merkle, Hasher};
 use sha2::{Digest, Sha256};
 
-/// SHA-256 pair hasher.
+/// SHA-256 node hasher.
 ///
-/// Hashes the two inputs in order — `sha256(left ‖ right)`, no sorting.
+/// Combines the two child hashes in order — `sha256(left ‖ right)`.
 struct Sha256Hasher;
 
 impl Hasher for Sha256Hasher {
@@ -35,10 +35,10 @@ impl Hasher for Sha256Hasher {
     }
 }
 
-/// Hash raw application bytes into a leaf digest.
+/// Leaf hasher.
 ///
-/// WARNING: example only, not production-safe. Single-hash leaves are open to the 64-byte
-/// second-preimage; use domain separation / double-hash in production.
+/// **WARNING:** example only, not production-safe. Hashing leaves with no domain
+/// separation opens a second-preimage attack; see the `domain_separated` example.
 fn leaf_hash(data: &[u8]) -> [u8; 32] {
     Sha256::digest(data).into()
 }
@@ -46,12 +46,10 @@ fn leaf_hash(data: &[u8]) -> [u8; 32] {
 fn main() {
     let hasher = Sha256Hasher;
 
-    // `padding` is the empty-leaf value used to pad the leaf count up to a power of two.
-    // It must not be a valid leaf value.
+    // The padding must not be a valid leaf value.
     let padding = [0u8; 32];
 
-    // Build the leaves. Five records -> odd count -> the tree is lazily padded up to a
-    // perfect 8-leaf tree.
+    // Build the leaves.
     let records: [&str; 5] = ["alice:100", "bob:50", "carol:75", "dave:25", "erin:200"];
     let leaves: Vec<[u8; 32]> = records.iter().map(|d| leaf_hash(d.as_bytes())).collect();
 
@@ -61,17 +59,14 @@ fn main() {
     });
     println!();
 
-    // Build the root. `root` and `proof` each *consume* the vector they are given,
-    // reusing it as in-place scratch buffer — that is how the library stays
-    // allocation-free internally.
+    // Compute the root.
     let root = merkle::root(&hasher, leaves.clone(), padding).expect("leaves are non-empty");
 
     println!("root:");
     println!("  0x{}", hex(&root));
     println!();
 
-    // Prove that leaf #2 ("carol:75") is in the tree at index 2. The proof is the list of
-    // sibling hashes on the path from the leaf up to the root, ordered leaf -> root.
+    // Build the proof.
     let leaf_idx = 2;
     let proof = merkle::proof(&hasher, leaves.clone(), leaf_idx, padding).expect("index is in range");
 

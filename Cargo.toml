@@ -1,6 +1,6 @@
 [package]
 name = "mriynyk-merkle"
-description = "Merkle tree utilities."
+description = "Minimal Merkle tree utilities, generic over any hasher."
 version = "0.1.0"
 edition = "2024"
 rust-version = "1.85"
