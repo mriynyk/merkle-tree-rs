@@ -36,6 +36,10 @@ alloc = []
 std = ["alloc"]
 
 [[example]]
+name = "sha256"
+required-features = ["alloc"]
+
+[[example]]
 name = "keccak256_positional"
 required-features = ["alloc"]
 
@@ -44,13 +48,9 @@ name = "keccak256_commutative"
 required-features = ["alloc"]
 
 [[example]]
-name = "sha256"
+name = "domain_separated"
 required-features = ["alloc"]
 
 [[example]]
 name = "poseidon"
-required-features = ["alloc"]
-
-[[example]]
-name = "domain_separated"
 required-features = ["alloc"]

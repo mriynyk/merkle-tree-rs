@@ -94,10 +94,10 @@ fn main() {
     println!("verification for leaf [{leaf_idx}] ({}):", records[leaf_idx]);
 
     let res = merkle::verify(&hasher, leaves[leaf_idx], leaf_idx, &proof, root);
-    println!("  index {leaf_idx} (correct)        -> {res:?}");
+    println!("  index {leaf_idx} (as built)        -> {res:?}");
 
     let res = merkle::verify(&hasher, leaves[leaf_idx], 0, &proof, root);
-    println!("  index 0 (wrong position) -> {res:?}");
+    println!("  index 0 (wrong position)  -> {res:?}");
 }
 
 fn hex(bytes: &[u8]) -> String {

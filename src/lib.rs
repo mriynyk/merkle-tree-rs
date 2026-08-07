@@ -76,6 +76,9 @@
 //! use mriynyk_merkle::{Hasher, root, proof, verify};
 //! use sha2::{Digest, Sha256};
 //!
+//! const LEAF_DOMAIN: u8 = 0x00;
+//! const NODE_DOMAIN: u8 = 0x01;
+//!
 //! struct Sha256Hasher;
 //!
 //! impl Hasher for Sha256Hasher {
@@ -84,6 +87,7 @@
 //!     fn hash(&self, left: &Self::Hash, right: &Self::Hash) -> Self::Hash {
 //!         let mut h = Sha256::new();
 //!
+//!         h.update([NODE_DOMAIN]);
 //!         h.update(left);
 //!         h.update(right);
 //!         h.finalize().into()
@@ -96,7 +100,8 @@
 //!
 //! let leaves: Vec<[u8; 32]> = ["alice", "bob", "carol"]
 //!     .iter()
-//!     .map(|data| Sha256::digest(data.as_bytes()).into())
+//!     .map(|data| [&[LEAF_DOMAIN], data.as_bytes()].concat())
+//!     .map(|data| Sha256::digest(data).into())
 //!     .collect();
 //!
 //! let root = root(&hasher, leaves.clone(), padding).unwrap();
@@ -114,12 +119,16 @@ mod proof;
 mod root;
 mod verify;
 
+#[cfg(test)]
+mod test_util;
+
 pub use hasher::Hasher;
 pub use process_proof::process_proof;
-#[cfg(feature = "alloc")]
-pub use proof::proof;
 pub use proof::{ProofError, proof_in_place};
-#[cfg(feature = "alloc")]
-pub use root::root;
 pub use root::{RootError, root_in_place};
 pub use verify::{VerifyError, verify};
+
+#[cfg(feature = "alloc")]
+pub use proof::proof;
+#[cfg(feature = "alloc")]
+pub use root::root;

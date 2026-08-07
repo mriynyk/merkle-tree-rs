@@ -94,3 +94,185 @@ impl core::fmt::Display for RootError {
 }
 
 impl core::error::Error for RootError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::*;
+
+    #[test]
+    fn with_one_leaf_returns_that_leaf() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 1] = build_leaves();
+        let tree: [Hash; 1] = build_tree(&hasher, leaves);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_two_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 2] = build_leaves();
+        let tree: [Hash; 3] = build_tree(&hasher, leaves);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_three_leaves_pads_the_odd_tail() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 3] = build_leaves();
+        let leaves_padded: [Hash; 4] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 7] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_four_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 4] = build_leaves();
+        let tree: [Hash; 7] = build_tree(&hasher, leaves);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_five_leaves_pads_on_two_levels() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_six_leaves_raises_the_padding_before_using_it() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 6] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_seven_leaves_uses_the_padding_without_raising_it() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 7] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_eight_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_nine_leaves_raises_the_padding_twice() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 9] = build_leaves();
+        let leaves_padded: [Hash; 16] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 31] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn with_twenty_leaves_raises_the_padding_three_times() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 20] = build_leaves();
+        let leaves_padded: [Hash; 32] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 63] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn supports_a_commutative_hasher() {
+        let hasher = CommutativeSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+        let mut buffer = leaves;
+        let root = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+
+        assert_eq!(root, root_of(&tree));
+    }
+
+    #[test]
+    fn hash_count_matches_the_tree_shape() {
+        let hasher = PositionalSha256::new();
+        let mut buffer: [Hash; 30] = build_leaves();
+
+        // Leaf count and the hashes it takes, as pairs + tails + raises.
+        let cases = [
+            (1, 0),   // 0 + 0 + 0
+            (2, 1),   // 1 + 0 + 0
+            (3, 3),   // 2 + 1 + 0
+            (4, 3),   // 3 + 0 + 0
+            (5, 7),   // 4 + 2 + 1
+            (6, 7),   // 5 + 1 + 1
+            (7, 7),   // 6 + 1 + 0
+            (8, 7),   // 7 + 0 + 0
+            (20, 24), // 19 + 2 + 3
+            (30, 31), // 29 + 1 + 1
+        ];
+
+        for (leaf_count, hashes) in cases {
+            hasher.reset_hash_count();
+            root_in_place(&hasher, &mut buffer[..leaf_count], PADDING).unwrap();
+
+            assert_eq!(hasher.hash_count(), hashes, "{leaf_count} leaves");
+        }
+    }
+
+    #[test]
+    fn rejects_empty_input() {
+        let hasher = PositionalSha256::new();
+        let mut buffer: [Hash; 0] = [];
+        let error = root_in_place(&hasher, &mut buffer, PADDING).unwrap_err();
+
+        assert_eq!(error, RootError::EmptyInput);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn owned_matches_in_place() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let mut buffer = leaves;
+        let expected = root_in_place(&hasher, &mut buffer, PADDING).unwrap();
+        let root = root(&hasher, leaves.to_vec(), PADDING).unwrap();
+
+        assert_eq!(root, expected);
+    }
+}

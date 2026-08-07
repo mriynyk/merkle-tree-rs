@@ -18,10 +18,10 @@
 //! domain tag before hashing — `0x00` for a leaf, `0x01` for a node — so a node preimage
 //! (`0x01 ‖ left ‖ right`) can never equal a leaf preimage (`0x00 ‖ data`).
 //!
-//! (OpenZeppelin's `StandardMerkleTree.js` reaches the same goal differently: it
-//! **double-hashes** leaves — `keccak256(keccak256(data))` — so a leaf can never match a
-//! single-hashed internal node. A domain tag is just a more explicit way to draw the same
-//! boundary.)
+//! OpenZeppelin's `StandardMerkleTree` (the `@openzeppelin/merkle-tree` JS library) reaches
+//! the same goal differently: it **double-hashes** leaves — `keccak256(keccak256(data))`
+//! — so a leaf can never match a single-hashed internal node. A domain tag is just a more
+//! explicit way to draw the same boundary.
 //!
 //! Run with:
 //!

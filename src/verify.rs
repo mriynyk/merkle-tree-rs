@@ -73,3 +73,168 @@ impl core::fmt::Display for VerifyError {
 }
 
 impl core::error::Error for VerifyError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::*;
+
+    const TOO_LONG_PROOF: [Hash; usize::BITS as usize] = [PADDING; usize::BITS as usize];
+
+    #[test]
+    fn accepts_the_proof_of_every_leaf() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+
+        for (leaf_idx, leaf) in leaves.into_iter().enumerate() {
+            let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+            let result = verify(&hasher, leaf, leaf_idx, &proof, root_of(&tree));
+
+            assert_eq!(result, Ok(()), "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn rejects_a_wrong_index_as_an_invalid_proof() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+        for wrong_idx in (0..leaves.len()).filter(|idx| *idx != leaf_idx) {
+            let result = verify(&hasher, leaves[leaf_idx], wrong_idx, &proof, root_of(&tree));
+
+            assert_eq!(result, Err(VerifyError::InvalidProof), "index {wrong_idx}");
+        }
+    }
+
+    #[test]
+    fn rejects_a_wrong_root_as_an_invalid_proof() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+        let mut wrong_root = root_of(&tree);
+        wrong_root[0] ^= 1;
+        let result = verify(&hasher, leaves[leaf_idx], leaf_idx, &proof, wrong_root);
+
+        assert_eq!(result, Err(VerifyError::InvalidProof));
+    }
+
+    #[test]
+    fn rejects_a_wrong_proof_length_as_an_invalid_proof() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+        let truncated = &proof[..2];
+        let extended = [proof[0], proof[1], proof[2], PADDING];
+
+        let result = verify(&hasher, leaves[leaf_idx], leaf_idx, truncated, root_of(&tree));
+
+        assert_eq!(result, Err(VerifyError::InvalidProof), "truncated");
+
+        let result = verify(&hasher, leaves[leaf_idx], leaf_idx, &extended, root_of(&tree));
+
+        assert_eq!(result, Err(VerifyError::InvalidProof), "extended");
+    }
+
+    #[test]
+    fn accepts_any_index_under_a_commutative_hasher() {
+        let hasher = CommutativeSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+        for any_idx in 0..leaves.len() {
+            let result = verify(&hasher, leaves[leaf_idx], any_idx, &proof, root_of(&tree));
+
+            assert_eq!(result, Ok(()), "index {any_idx}");
+        }
+    }
+
+    #[test]
+    fn accepts_an_empty_proof_only_at_index_zero() {
+        let hasher = PositionalSha256::new();
+        let leaf: Hash = [1; 32];
+        let proof: [Hash; 0] = [];
+        let result = verify(&hasher, leaf, 0, &proof, leaf);
+
+        assert_eq!(result, Ok(()), "index 0");
+
+        for above_the_tree_idx in 1..4 {
+            let result = verify(&hasher, leaf, above_the_tree_idx, &proof, leaf);
+
+            assert_eq!(result, Err(VerifyError::IndexOutOfRange), "index {above_the_tree_idx}");
+        }
+    }
+
+    #[test]
+    fn rejects_an_index_above_the_tree() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+        for above_the_tree_idx in [8, 9, usize::MAX] {
+            let result = verify(&hasher, leaves[leaf_idx], above_the_tree_idx, &proof, root_of(&tree));
+
+            assert_eq!(result, Err(VerifyError::IndexOutOfRange), "index {above_the_tree_idx}");
+        }
+    }
+
+    #[test]
+    fn rejects_a_proof_too_long_to_index() {
+        let hasher = PositionalSha256::new();
+        let leaf: Hash = [1; 32];
+        let result = verify(&hasher, leaf, 0, &TOO_LONG_PROOF, leaf);
+
+        assert_eq!(result, Err(VerifyError::ProofTooLong));
+    }
+
+    #[test]
+    fn checks_the_proof_length_before_the_index() {
+        let hasher = PositionalSha256::new();
+        let leaf: Hash = [1; 32];
+        let result = verify(&hasher, leaf, usize::MAX, &TOO_LONG_PROOF, leaf);
+
+        assert_eq!(result, Err(VerifyError::ProofTooLong));
+    }
+
+    #[test]
+    fn folds_the_longest_accepted_proof() {
+        let hasher = PositionalSha256::new();
+        let leaf: Hash = [1; 32];
+        let proof = [PADDING; usize::BITS as usize - 1];
+        hasher.reset_hash_count();
+        let result = verify(&hasher, leaf, 0, &proof, leaf);
+
+        assert_eq!(result, Err(VerifyError::InvalidProof));
+        assert_eq!(hasher.hash_count(), proof.len());
+    }
+
+    #[test]
+    fn does_not_hash_rejected_input() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+        let leaf_idx = 2;
+        let proof: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+        hasher.reset_hash_count();
+        let _ = verify(&hasher, leaves[leaf_idx], 1 << proof.len(), &proof, root_of(&tree));
+
+        assert_eq!(hasher.hash_count(), 0, "index out of range");
+
+        hasher.reset_hash_count();
+        let _ = verify(&hasher, leaves[leaf_idx], 0, &TOO_LONG_PROOF, root_of(&tree));
+
+        assert_eq!(hasher.hash_count(), 0, "proof too long");
+    }
+}

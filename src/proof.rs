@@ -27,7 +27,7 @@ use alloc::vec::Vec;
 /// # Errors
 ///
 /// - [`ProofError::EmptyInput`] if the input contains no leaves.
-/// - [`ProofError::IndexOutOfRange`] if `leaf_idx` is not below `buffer.len()`.
+/// - [`ProofError::IndexOutOfRange`] if `leaf_idx` is not below the number of leaves.
 pub fn proof_in_place<'b, H: Hasher>(
     hasher: &H,
     buffer: &'b mut [H::Hash],
@@ -141,7 +141,7 @@ pub fn proof<H: Hasher>(
 pub enum ProofError {
     /// The input contains no leaves.
     EmptyInput,
-    /// `leaf_idx` is not a valid index into the leaves.
+    /// The leaf index is not below the number of leaves.
     IndexOutOfRange,
 }
 
@@ -155,3 +155,252 @@ impl core::fmt::Display for ProofError {
 }
 
 impl core::error::Error for ProofError {}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::*;
+
+    #[test]
+    fn with_one_leaf_is_empty() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 1] = build_leaves();
+        let tree: [Hash; 1] = build_tree(&hasher, leaves);
+        let mut buffer = leaves;
+        let proof = proof_in_place(&hasher, &mut buffer, 0, PADDING).unwrap();
+        let expected: [Hash; 0] = build_proof(&tree, 0);
+
+        assert_eq!(proof, &expected[..]);
+    }
+
+    #[test]
+    fn with_two_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 2] = build_leaves();
+        let tree: [Hash; 3] = build_tree(&hasher, leaves);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 1] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_three_leaves_pads_the_missing_sibling() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 3] = build_leaves();
+        let leaves_padded: [Hash; 4] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 7] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 2] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_four_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 4] = build_leaves();
+        let tree: [Hash; 7] = build_tree(&hasher, leaves);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 2] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_five_leaves_pads_on_two_levels() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_six_leaves_raises_the_padding_before_using_it() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 6] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_seven_leaves_uses_the_padding_without_raising_it() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 7] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_eight_leaves_needs_no_padding() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 8] = build_leaves();
+        let tree: [Hash; 15] = build_tree(&hasher, leaves);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_nine_leaves_raises_the_padding_twice() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 9] = build_leaves();
+        let leaves_padded: [Hash; 16] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 31] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 4] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn with_twenty_leaves_raises_the_padding_three_times() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 20] = build_leaves();
+        let leaves_padded: [Hash; 32] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 63] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 5] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn supports_a_commutative_hasher() {
+        let hasher = CommutativeSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let leaves_padded: [Hash; 8] = pad_leaves(&leaves, PADDING);
+        let tree: [Hash; 15] = build_tree(&hasher, leaves_padded);
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+            let expected: [Hash; 3] = build_proof(&tree, leaf_idx);
+
+            assert_eq!(proof, &expected[..], "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn hash_count_matches_the_tree_shape() {
+        let hasher = PositionalSha256::new();
+        let mut buffer: [Hash; 30] = build_leaves();
+
+        // Leaf count and the hashes it takes, as pairs + tails + raises - skips. The
+        // skipped node is the one on the path, one per level.
+        let cases = [
+            (1, 0),   // 0 + 0 + 0 - 0
+            (2, 0),   // 1 + 0 + 0 - 1
+            (3, 1),   // 2 + 1 + 0 - 2
+            (4, 1),   // 3 + 0 + 0 - 2
+            (5, 4),   // 4 + 2 + 1 - 3
+            (6, 4),   // 5 + 1 + 1 - 3
+            (7, 4),   // 6 + 1 + 0 - 3
+            (8, 4),   // 7 + 0 + 0 - 3
+            (20, 19), // 19 + 2 + 3 - 5
+            (30, 26), // 29 + 1 + 1 - 5
+        ];
+
+        for (leaf_count, hashes) in cases {
+            hasher.reset_hash_count();
+            proof_in_place(&hasher, &mut buffer[..leaf_count], 0, PADDING).unwrap();
+
+            assert_eq!(hasher.hash_count(), hashes, "{leaf_count} leaves");
+        }
+    }
+
+    #[test]
+    fn hash_count_ignores_the_leaf_index() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 20] = build_leaves();
+
+        for leaf_idx in 0..leaves.len() {
+            let mut buffer = leaves;
+            hasher.reset_hash_count();
+            proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+
+            assert_eq!(hasher.hash_count(), 19, "leaf {leaf_idx}");
+        }
+    }
+
+    #[test]
+    fn rejects_empty_input() {
+        let hasher = PositionalSha256::new();
+        let mut buffer: [Hash; 0] = [];
+        let error = proof_in_place(&hasher, &mut buffer, 0, PADDING).unwrap_err();
+
+        assert_eq!(error, ProofError::EmptyInput);
+    }
+
+    #[test]
+    fn rejects_an_index_past_the_last_leaf() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let mut buffer = leaves;
+        let error = proof_in_place(&hasher, &mut buffer, leaves.len(), PADDING).unwrap_err();
+
+        assert_eq!(error, ProofError::IndexOutOfRange);
+    }
+
+    #[cfg(feature = "alloc")]
+    #[test]
+    fn owned_matches_in_place() {
+        let hasher = PositionalSha256::new();
+        let leaves: [Hash; 5] = build_leaves();
+        let leaf_idx = 2;
+        let mut buffer = leaves;
+        let expected = proof_in_place(&hasher, &mut buffer, leaf_idx, PADDING).unwrap();
+        let proof = proof(&hasher, leaves.to_vec(), leaf_idx, PADDING).unwrap();
+
+        assert_eq!(proof, expected);
+    }
+}
