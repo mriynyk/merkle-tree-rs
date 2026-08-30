@@ -56,16 +56,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ env.BUILD_TOOLCHAIN }}
-      # `--lib`, because the doctest uses the `alloc`-gated `root` and `proof`,
-      # and this is the only run that executes the allocator-free path.
-      - run: cargo test --locked --lib
+      - run: cargo test --locked
       - run: cargo test --locked --all-features
       # `--all-features`, because every example is `required-features = ["alloc"]`
       # and without it this builds nothing and still reports success.
       - run: cargo build --locked --examples --all-features
 
   no-std:
-    name: no_std (thumbv7em-none-eabi)
+    name: no-std (thumbv7em-none-eabi)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -76,8 +74,8 @@ jobs:
       - run: cargo build --locked --lib --target thumbv7em-none-eabi
       - run: cargo build --locked --lib --features alloc --target thumbv7em-none-eabi
 
-  pointer-width:
-    name: 32-bit (i686-unknown-linux-gnu)
+  bit32:
+    name: bit32 (i686-unknown-linux-gnu)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7

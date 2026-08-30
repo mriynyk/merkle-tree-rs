@@ -46,6 +46,23 @@
 //! - To verify a proof against a root, those siblings are folded with the leaf and the
 //!   result is compared with the root.
 //!
+//! ## Hash count
+//!
+//! The number of hasher calls follows from the number of leaves alone.
+//!
+//! Computing a root takes `n - 1` calls to combine nodes into parents, one more for every
+//! level holding an odd number of nodes, and one for every level the padding is raised
+//! through. The last of these is the index of the highest level with an odd node count,
+//! and none when no level is odd.
+//!
+//! Building a proof takes fewer calls, by the height of the tree, since the node on the
+//! path to the leaf is left unhashed on every level.
+//!
+//! Reconstructing a root from a proof, and verifying one, take a call per proof entry.
+//!
+//! Hashing data into leaves happens before any of these functions is called and is not
+//! counted.
+//!
 //! ## Features
 //!
 //! - **`default`** — the allocator-free API: [`root_in_place`], [`proof_in_place`],
@@ -73,7 +90,7 @@
 //! ## Example
 //!
 //! ```
-//! use mriynyk_merkle::{Hasher, root, proof, verify};
+//! use mriynyk_merkle::{Hasher, proof_in_place, root_in_place, verify};
 //! use sha2::{Digest, Sha256};
 //!
 //! const LEAF_DOMAIN: u8 = 0x00;
@@ -98,16 +115,22 @@
 //! let padding = [0u8; 32];
 //! let leaf_idx = 1;
 //!
-//! let leaves: Vec<[u8; 32]> = ["alice", "bob", "carol"]
-//!     .iter()
-//!     .map(|data| [&[LEAF_DOMAIN], data.as_bytes()].concat())
-//!     .map(|data| Sha256::digest(data).into())
-//!     .collect();
+//! let leaves: [[u8; 32]; 3] = ["alice", "bob", "carol"].map(|data| {
+//!     let mut h = Sha256::new();
 //!
-//! let root = root(&hasher, leaves.clone(), padding).unwrap();
-//! let proof = proof(&hasher, leaves.clone(), leaf_idx, padding).unwrap();
+//!     h.update([LEAF_DOMAIN]);
+//!     h.update(data);
+//!     h.finalize().into()
+//! });
 //!
-//! assert!(verify(&hasher, leaves[leaf_idx], leaf_idx, &proof, root).is_ok());
+//! // Both functions consume the buffer they reduce, so each one gets its own copy.
+//! let mut buffer = leaves;
+//! let root = root_in_place(&hasher, &mut buffer, padding).unwrap();
+//!
+//! let mut buffer = leaves;
+//! let proof = proof_in_place(&hasher, &mut buffer, leaf_idx, padding).unwrap();
+//!
+//! assert!(verify(&hasher, leaves[leaf_idx], leaf_idx, proof, root).is_ok());
 //! ```
 
 #[cfg(feature = "alloc")]
