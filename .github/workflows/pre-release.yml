@@ -1,0 +1,38 @@
+name: Pre-release
+
+# Run by hand before publishing, to confirm the crate is ready: that docs.rs
+# will build it, and that packaging is sound.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  docs-rs:
+    name: docs.rs build
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: --cfg docsrs
+    steps:
+      - uses: actions/checkout@v7
+      # `nightly` and `--cfg docsrs`, because `doc_cfg` is still unstable, and
+      # this is the toolchain docs.rs builds a published crate with.
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: nightly
+      - run: cargo doc --locked --all-features --no-deps
+
+  publish:
+    name: publish dry run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: stable
+      - run: cargo publish --locked --dry-run

@@ -1,0 +1,113 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  # Pinned: new lints in a new release must not turn a blocking job red.
+  LINT_TOOLCHAIN: '1.97'
+  # Unpinned: a break on a new compiler must surface here, not at a user.
+  BUILD_TOOLCHAIN: stable
+  # Must match `rust-version` in Cargo.toml.
+  MSRV_TOOLCHAIN: '1.85'
+
+jobs:
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.LINT_TOOLCHAIN }}
+          components: rustfmt
+      - run: cargo fmt --all --check
+
+  clippy:
+    name: clippy (${{ matrix.name }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: default features
+            features: ''
+          - name: all features
+            features: --all-features
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.LINT_TOOLCHAIN }}
+          components: clippy
+      - run: cargo clippy --locked --all-targets ${{ matrix.features }} -- -D warnings
+
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.BUILD_TOOLCHAIN }}
+      - run: cargo test --locked
+      - run: cargo test --locked --all-features
+      # `--all-features`, because every example is `required-features = ["alloc"]`
+      # and without it this builds nothing and still reports success.
+      - run: cargo build --locked --examples --all-features
+
+  no-std:
+    name: no-std (thumbv7em-none-eabi)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.BUILD_TOOLCHAIN }}
+          targets: thumbv7em-none-eabi
+      - run: cargo build --locked --lib --target thumbv7em-none-eabi
+      - run: cargo build --locked --lib --features alloc --target thumbv7em-none-eabi
+
+  bit32:
+    name: bit32 (i686-unknown-linux-gnu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.BUILD_TOOLCHAIN }}
+          targets: i686-unknown-linux-gnu
+      - run: sudo apt-get update && sudo apt-get install --yes gcc-multilib
+      # `--target`, because this is the only job that runs the tests where
+      # `usize::BITS` is not 64.
+      - run: cargo test --locked --lib --all-features --target i686-unknown-linux-gnu
+
+  msrv:
+    name: msrv
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.MSRV_TOOLCHAIN }}
+      # `build`, not `test`, because dev-dependencies have their own MSRVs and
+      # are not part of the claim.
+      - run: cargo build --locked --all-features
+
+  doc:
+    name: doc
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ env.LINT_TOOLCHAIN }}
+      - run: cargo doc --locked --all-features --no-deps

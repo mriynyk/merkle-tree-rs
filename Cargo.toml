@@ -1,18 +1,56 @@
-[workspace]
-resolver = "3"
-members = ["crates/core", "crates/cli"]
-
-[workspace.package]
+[package]
+name = "mriynyk-merkle"
+description = "Minimal Merkle tree utilities, generic over any hasher."
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.85"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/mriynyk/merkle-tree-rs"
-version = "0.1.0"
+homepage = "https://github.com/mriynyk/merkle-tree-rs"
+readme = "README.md"
+keywords = ["merkle-tree", "merkle-proof", "no-std", "blockchain", "zk"]
+categories = [
+    "cryptography",
+    "cryptography::cryptocurrencies",
+    "data-structures",
+    "no-std",
+    "no-std::no-alloc",
+]
 
-[workspace.dependencies]
-mriynyk-merkle = { path = "crates/core", version = "0.1.0" }
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
-[profile.release]
-lto = true
-codegen-units = 1
-strip = true
+[dependencies]
+
+[dev-dependencies]
+sha3 = "0.12.0"
+sha2 = "0.11.0"
+light-poseidon = "0.4.0"
+ark-ff = "0.5.0"
+ark-bn254 = "0.5.0"
+
+[features]
+default = []
+alloc = []
+std = ["alloc"]
+
+[[example]]
+name = "sha256"
+required-features = ["alloc"]
+
+[[example]]
+name = "keccak256_positional"
+required-features = ["alloc"]
+
+[[example]]
+name = "keccak256_commutative"
+required-features = ["alloc"]
+
+[[example]]
+name = "domain_separated"
+required-features = ["alloc"]
+
+[[example]]
+name = "poseidon"
+required-features = ["alloc"]
